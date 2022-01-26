@@ -77,7 +77,7 @@ void setup()
     lidarliteAddress: Default 0x62. Fill in new address here if changed. See
     operating manual for instructions.
   */
-  myLidarLite.configure(0); // Change this number to try out alternate configurations
+  myLidarLite.configure(1); // Change this number to try out alternate configurations
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,14 +123,14 @@ int dist_ave(int n_meas)
     static unsigned int n = 0;
     long sum = 0;
     
-    sum = myLidarLite.distance(false); // First measurement always with calibration
+    sum = myLidarLite.distance(true); // First measurement always with calibration
     n = 1;   
   
     for (int i = 1; i < n_meas; i++)
     {
       if (n >= 100) // Make a calibrated measurement after avery 100 measurements
       {
-        sum += myLidarLite.distance(false);
+        sum += myLidarLite.distance(true);
         n = 1;
       }
       else
