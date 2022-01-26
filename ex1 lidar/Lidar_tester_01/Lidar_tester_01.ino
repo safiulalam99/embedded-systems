@@ -6,9 +6,7 @@
 
 #define USE_LCD 0
 
-#if USE_LCD
 #include <LiquidCrystal.h>                            // include LCD library
-#endif
 
 #include <TimerOne.h>
 #include <Wire.h>
@@ -16,10 +14,8 @@
 
 LIDARLite myLidarLite;
 
-#if USE_LCD
 //                RS  E   D4  D5  D6  D7
 LiquidCrystal lcd(37, 36, 35, 34, 33, 32);            // LCD pin wiring settings
-#endif
 
 
 int dist_r(void);
@@ -33,7 +29,6 @@ void setup()
   Serial.println("+++ Lidar_tester_01: booting UP  +++");
   Serial.println("++++++++++++++++++++++++++++++++++++");
 
-#if USE_LCD
   lcd.begin(20, 4);                     // Display size defination 20 char  4 row
   //         012345678901234567890
   lcd.print("+++++++++++++++++++++");   // Print to lCD
@@ -43,7 +38,6 @@ void setup()
   lcd.print("++ TAMK 2021 ++++++++");
   lcd.setCursor(0, 3);
   lcd.print("+++++++++++++++++++++");
-#endif
 
   delay(1000);
 
@@ -83,7 +77,7 @@ void setup()
     lidarliteAddress: Default 0x62. Fill in new address here if changed. See
     operating manual for instructions.
   */
-  myLidarLite.configure(1); // Change this number to try out alternate configurations
+  myLidarLite.configure(0); // Change this number to try out alternate configurations
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,16 +98,14 @@ void loop()
     Serial.print("Avg. dist. cm = ");
     Serial.println(dist_ave(5));
 
-#if USE_LCD
     lcd.setCursor(0, 1);                                // set curosor to left upper corner
     //         012345678901234567890
-    lcd.pri8nt("                    ");                  // print to lCD
+    lcd.print("                    ");                  // print to lCD
 
     lcd.setCursor(0, 1);                                // set curosor to left upper corner
     //         012345678901234567890
     lcd.print("Dist = ");                  // print to lCD
-    lcd.print(ds);                  // print to lCD
-#endif
+    lcd.print(dist_ave(1));                  // print to lCD
 
     // delay(200);
   }
