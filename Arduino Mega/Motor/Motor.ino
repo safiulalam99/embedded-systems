@@ -8,7 +8,7 @@ int check=0;
  
 int xPin=A0;
 int yPin=A1;
-int swPin=2;
+int swPin=18;
 int xPos, yPos=0;
 boolean swState=0;
 bool LED_state=false;
