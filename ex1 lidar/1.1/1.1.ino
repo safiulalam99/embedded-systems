@@ -18,13 +18,23 @@ int lidarMeasure = 0;
 int buttonState = 0;
 bool taken = false;
 
+int pulse_right = 0;
+int pulse_left = 0;
+int previousRight = 0;
+int previousLeft = 0;
+
 void setup(){
   pinMode(swPin, INPUT);
+  pinMode(2, INPUT);
+  pinMode(3, INPUT);
+  attachInterrupt(digitalPinToInterrupt(2), isr_right, RISING); //counting pulse from right motor
+  attachInterrupt(digitalPinToInterrupt(3), isr_left, RISING);  //counting pulse from left motor
+  
   Serial.begin(9600);
   Serial.println("Lidar booting up");
 
   lcd.begin(20, 4);
-  lcd.setCursor(4, 0);
+  lcd.setCursor(2, 0);
   lcd.print("Distance ");
        //01234567890123456789
   lcd.setCursor(0, 2);
@@ -38,23 +48,28 @@ void setup(){
   //Better accuracy close range
 }
 
+bool ui = true;
+
 void loop(){
   /*
    * For lidar setting 
    */
-  
-  int lidarValueTrue = myLidar.distance(true);
-  //True = taking error into consideration(recaliberation)
-  //Every 100 measures should have a caliberation
-  //Default setting = false
-  if (lidarMeasure == 0){
-    showInfo(lidarValueTrue);  
+  if (ui == true){
+    int lidarValueTrue = myLidar.distance(true);
+    //True = taking error into consideration(recaliberation)
+    //Every 100 measures should have a caliberation
+    //Default setting = false
+    if (lidarMeasure == 0){
+      showInfo(lidarValueTrue);  
+    } else {
+      //Continue printing value but without caliberation
+      showInfo(myLidar.distance());
+      if (lidarMeasure == 100) lidarMeasure = -1;
+    }
+    lidarMeasure++;
   } else {
-    //Continue printing value but without caliberation
-    showInfo(myLidar.distance());
-    if (lidarMeasure == 100) lidarMeasure = -1;
+    showInfoPanel();
   }
-  lidarMeasure++;
 
   /*
    * Motor controlled by joystick
@@ -69,67 +84,63 @@ void loop(){
   serialControl();
 }
 
-void serial_control(){
+void serialControl(){
   if (Serial.available() > 0){
     String message = Serial.readStringUntil('\n');
     String stat;
     int colon, value; 
-    int movePos = message.indexOf("Move");
-    int dirPos = message.indexOf("Turn");
     int lcdPos = message.indexOf("LCD");
     int printPos = message.indexOf("Print");
     int area = message.indexOf("Area");
     int volume = message.indexOf("Volume");
+    int panel = message.indexOf("Panel");
+
+    if (panel > -1){
+      ui = !ui;
+    }
 
     if (area > -1){
+      lcd.setCursor(0, 3);
+      lcd.print("                    ");
+               //01234567890123456789
+               
       int x, y;
       Serial.println("Keep the robot in one direction then wait for 3 seconds");
       delay(3000);
       x = myLidar.distance(true);
+      Serial.println(x);
       Serial.println("Keep the robot in another direction then wait for 3 seconds");
       delay(3000);
       y = myLidar.distance(true);
+      Serial.println(y);
       x = x * y;
+      double area = x / 10000;
       lcd.setCursor(0, 3);
-      lcd.print("Area: ");      lcd.print(x);
+      lcd.print("Area: ");      lcd.print(area);    lcd.print(" ");   lcd.print("m^2"); 
     }
 
     if (volume > -1){
+      lcd.setCursor(0, 3);
+      lcd.print("                    ");
+               //01234567890123456789
+               
       int x, y, z;
       Serial.println("Keep the robot in one direction then wait for 3 seconds");
       delay(3000);
       x = myLidar.distance(true);
+      Serial.println(x);
       Serial.println("Keep the robot in another direction then wait for 3 seconds");
       delay(3000);
       y = myLidar.distance(true);
+      Serial.println(y);
       Serial.println("Keep the robot in another direction then wait for 3 seconds");
       delay(3000);
       z = myLidar.distance(true);
+      Serial.println(z);
       x = x * y * z;
+      double volume = x / 1000000;
       lcd.setCursor(0, 3);
-      lcd.print("Volume: ");      lcd.print(x);
-    }
-    
-    if (movePos > -1){
-      colon = message.indexOf(":");
-      if (colon > -1){
-        stat = message.substring(colon + 1);
-        move_distance = stat.toInt();
-        gobackward = true;
-        buttonPress = true;
-        Serial.print("Move :");  Serial.println(move_distance);
-      }
-    }
-
-    if (dirPos > -1){
-      colon = message.indexOf(":");
-      if (colon > -1){
-        stat = message.substring(colon + 1);
-        value = stat.toInt();
-        Serial.print("Turn: "); Serial.println(value);
-        turnBool = true;
-        wheel_control(value);        
-      }
+      lcd.print("Volume: ");      lcd.print(volume);    lcd.print(" ");   lcd.print("m^3");
     }
 
     if (lcdPos > -1){
@@ -162,9 +173,11 @@ void showInfo(int lidar){
 
   //Print to LCD with a bar to determine the distance
   //Print raw value to LCD
-  lcd.setCursor(13, 0);
+  lcd.setCursor(11, 0);
   lcd.print(lidar);
-  lcd.print("  ");
+  lcd.print(" ");
+  lcd.print("cm");
+  lcd.print("   ");
   //Print the asterisk based on a metric
   int spaceAmount = 0;
   //lcd.setCursor(0, 0);
@@ -196,6 +209,7 @@ void showInfo(int lidar){
 #define Power_right 10
 #define forw LOW
 #define back HIGH
+int motor_speed = 200;
 
 void motor(double x, double y){ 
   //control bot using joystick
@@ -228,37 +242,48 @@ void motor(double x, double y){
   analogWrite(Power_right, right);
 }
 
-int button(int &x, int &y, int &z){
-  int distance = myLidar.distance(true);
-  switch (buttonState)
-  {
-  case 0:
-    x = distance;
-    buttonState = 1;
-    break;
-  case 1:
-    y = distance;
-    buttonState = 2;
-    break;
-  case 2:
-    z = distance;
-    buttonState = 0;
-    taken == true;
-  default:
-    break;
+void showInfoPanel(){
+  while(true){
+  //lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Adj. dist 30 cm");
+
+  int measureDistance = myLidar.distance(true);
+  lcd.setCursor(0, 1);
+  lcd.print("Meas. dist ");
+  lcd.print(measureDistance);
+
+  int gobackward = true;
+  lcd.setCursor(0, 2);
+  lcd.print("Motor stat ");
+  if (measureDistance < 22) {
+    digitalWrite(Dir_right, back);
+    analogWrite(Power_right, motor_speed);
+    digitalWrite(Dir_left, back);
+    analogWrite(Power_left, motor_speed);
+    lcd.print("Back");
+  } else 
+  if (measureDistance > 38){
+    digitalWrite(Dir_right, forw);
+    analogWrite(Power_right, motor_speed);
+    digitalWrite(Dir_left, forw);
+    analogWrite(Power_left, motor_speed);
+    lcd.print("Forw");
+  } else {
+    analogWrite(Power_right, 0);
+    analogWrite(Power_left, 0);
+    lcd.print("Off ");
+  }
   }
 }
 
-void dimension(){
-  int x, y, z;
-  int pullup = digitalRead(swPin);
-  if (pullup == HIGH) button(x,y,z);
-  if (taken == true){
-    x = x*y*z;
-    taken = false;
-  }
-  Serial.println(x);
-  lcd.setCursor(0,3);
-  lcd.print(x);
-  lcd.print("    ");
+//count the pulses of both motors
+void isr_right(){
+  pulse_right++;
+  previousRight++;
+}
+
+void isr_left(){
+  pulse_left++;
+  previousLeft++;
 }
