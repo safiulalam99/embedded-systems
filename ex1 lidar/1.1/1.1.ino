@@ -97,6 +97,7 @@ void serialControl(){
 
     if (panel > -1){
       ui = !ui;
+      lcd.clear();
     }
 
     if (area > -1){
