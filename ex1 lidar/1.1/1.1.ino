@@ -12,16 +12,21 @@ int xPin = A0;
 int yPin = A1;
 int swPin = 18;
 
-//lidar measurements
-int lidarMeasure = 0;
-
+//button
 int buttonState = 0;
 bool taken = false;
 
+//motors
 int pulse_right = 0;
 int pulse_left = 0;
 int previousRight = 0;
 int previousLeft = 0;
+
+//keep a certain distance from an object
+int adjDis = 30;
+
+//set path have to follow
+int path = 0;
 
 void setup(){
   pinMode(swPin, INPUT);
@@ -55,18 +60,8 @@ void loop(){
    * For lidar setting 
    */
   if (ui == true){
-    int lidarValueTrue = myLidar.distance(true);
-    //True = taking error into consideration(recaliberation)
-    //Every 100 measures should have a caliberation
-    //Default setting = false
-    if (lidarMeasure == 0){
-      showInfo(lidarValueTrue);  
-    } else {
-      //Continue printing value but without caliberation
-      showInfo(myLidar.distance());
-      if (lidarMeasure == 100) lidarMeasure = -1;
-    }
-    lidarMeasure++;
+    int lidarValueTrue = disAve(10);
+    showInfo(lidarValueTrue);
   } else {
     showInfoPanel();
   }
@@ -94,7 +89,35 @@ void serialControl(){
     int area = message.indexOf("Area");
     int volume = message.indexOf("Volume");
     int panel = message.indexOf("Panel");
+    int adjusted = message.indexOf("Adjust");
+    int path = message.indexOf("Path");
 
+    if (path > -1){
+      colon = message.indexOf(":");
+      if (colon > -1){
+        stat = message.substring(colon + 1);
+        value = stat.toInt();
+        if (value == 1){
+          path = 1;
+          Serial.println("Path 1");
+        } else if (value == 2){
+          path = 2;
+          Serial.println("Path 2");
+        } else {
+          Serial.println("Please set path to 1 or 2");
+        }
+      }
+    }
+
+    if (adjusted > -1){
+      colon = message.indexOf(":");
+      if (colon > -1){
+        stat = message.substring(colon + 1);
+        adjDis = stat.toInt();
+        Serial.print("Adjusted distance = "); Serial.println(adjDis);
+      }
+    }
+    
     if (panel > -1){
       ui = !ui;
       lcd.clear();
@@ -247,9 +270,11 @@ void showInfoPanel(){
   while(true){
   //lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Adj. dist 30 cm");
-
-  int measureDistance = myLidar.distance(true);
+  lcd.print("Adj. dist ");
+  lcd.print(adjDis);
+  lcd.print(" cm");
+  
+  int measureDistance = disAve(10);
   lcd.setCursor(0, 1);
   lcd.print("Meas. dist ");
   lcd.print(measureDistance);
@@ -275,6 +300,28 @@ void showInfoPanel(){
     analogWrite(Power_left, 0);
     lcd.print("Off ");
   }
+  }
+}
+
+//Average distance
+int disAve(int mean){
+  if (mean <= 0) return -1;
+  else {
+    static unsigned int n = 0;
+    long sum = 0;
+    sum = myLidar.distance(true);
+    n = 1;
+    for (int i = 0; i < mean; i++){
+      if (n > 100){
+        n = 1;
+        sum += myLidar.distance(true);
+      } else {
+        n++;
+        sum += myLidar.distance();
+      }
+    }
+    sum = sum / mean;
+    return (int) sum;
   }
 }
 
