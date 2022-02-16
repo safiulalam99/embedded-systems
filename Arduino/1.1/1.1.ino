@@ -19,6 +19,13 @@ int buttonState = 0;
 bool taken = false;
 
 //motors
+#define Dir_left    7
+#define Dir_right   8
+#define Power_left  9
+#define Power_right 10
+#define forw LOW
+#define back HIGH
+int motor_speed = 200;
 int pulse_right = 0;
 int pulse_left = 0;
 int previousRight = 0;
@@ -26,6 +33,7 @@ int previousLeft = 0;
 
 //keep a certain distance from an object
 int adjDis = 30;
+bool done = true;
 
 //set path have to follow
 int path = 0;
@@ -33,6 +41,7 @@ int path = 0;
 //for compass when to turn
 bool turnBool = false;
 double raw;
+int turnMode = 0; //0 straight, 1 turn left, 2 turn right
 
 void setup(){
   pinMode(swPin, INPUT);
@@ -85,6 +94,29 @@ void loop(){
   serialControl();
 }
 
+void adjDistance(){
+  done = false;
+  int lidarValue;
+  while (!done)
+    lidarValue = disAve(10);
+    showInfoPanel();
+    if (lidarValue > adjDis){
+      digitalWrite(Dir_left, forw);
+      digitalWrite(Dir_right, forw);
+      analogWrite(Power_left, 200);
+      analogWrite(Power_right, 200);
+    } else if (lidarValue < adjDis){
+      digitalWrite(Dir_left, back);
+      digitalWrite(Dir_right, back);
+      analogWrite(Power_left, 200);
+      analogWrite(Power_right, 200);
+    } else if (lidarValue == adjDis){
+      done = true;
+      analogWrite(Power_left, 0);
+      analogWrite(Power_right, 0);
+    }
+}
+
 void serialControl(){
   if (Serial.available() > 0){
     String message = Serial.readStringUntil('\n');
@@ -98,6 +130,41 @@ void serialControl(){
     int adjusted = message.indexOf("Adjust");
     int path = message.indexOf("Path");
     int turn = message.indexOf("Turn");
+    int preset = message.indexOf("Run");
+
+    if (preset > -1){
+      colon = message.indexOf(":");
+      if (colon > -1){
+        stat = message.substring(colon + 1);
+        value = stat.toInt();
+        if (value == 1){
+          adjDis = 20;
+          adjDistance();
+          compassControl(-90);
+          adjDis = 25;
+          adjDistance();
+          compassControl(-90);
+          adjDis = 20;
+          adjDistance();
+        }
+        if (value == 2){
+          adjDis = 20;
+          adjDistance();
+          compassControl(-90);
+          adjDis = 25;
+          adjDistance();
+          compassControl(-135);
+          adjDis = 20;
+          adjDistance();
+          compassControl(45);
+          adjDis = 20;
+          adjDistance();
+          compassControl(90);
+          adjDis = 25;
+          adjDistance();
+        }
+      }
+    }
 
     if (turn > -1){
       colon = message.indexOf(":");
@@ -246,17 +313,46 @@ void showInfo(int lidar){
   lcd.print("*");
 }
 
+//for various other exercise
+void showInfoPanel(){
+  while(true){
+  //lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Adj. dist ");
+  lcd.print(adjDis);
+  lcd.print(" cm");
+  
+  int measureDistance = disAve(10);
+  lcd.setCursor(0, 1);
+  lcd.print("Meas. dist ");
+  lcd.print(measureDistance);
+
+  lcd.setCursor(0, 2);
+  lcd.print("Motor stat ");
+  //         012345678901234567890
+
+  lcd.setCursor(0, 3);
+  lcd.print("Dire: ");
+  showCompass(compass());
+  }
+}
+
+//show compass infomration
+void showCompass(int dir){
+  if (dir > 294 && dir <= 338) lcd.print("NW");
+  if (dir > 338 && dir <= 360) lcd.print("N ");
+  if (dir >= 0 && dir <= 23) lcd.print("N ");
+  if (dir > 23 && dir <= 67) lcd.print("NE");
+  if (dir > 67 && dir <= 112) lcd.print("E ");
+  if (dir > 112 && dir <= 157) lcd.print("SE");
+  if (dir > 157 && dir <= 202) lcd.print("S ");
+  if (dir > 202 && dir <= 247) lcd.print("SW");
+  if (dir > 247 && dir <= 294) lcd.print("W ");
+}
+
 /*
  * Controlling using joystick
  */
-#define Dir_left    7
-#define Dir_right   8
-#define Power_left  9
-#define Power_right 10
-#define forw LOW
-#define back HIGH
-int motor_speed = 200;
-
 void motor(double x, double y){ 
   //control bot using joystick
 
@@ -288,43 +384,6 @@ void motor(double x, double y){
   analogWrite(Power_right, right);
 }
 
-void showInfoPanel(){
-  while(true){
-  //lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Adj. dist ");
-  lcd.print(adjDis);
-  lcd.print(" cm");
-  
-  int measureDistance = disAve(10);
-  lcd.setCursor(0, 1);
-  lcd.print("Meas. dist ");
-  lcd.print(measureDistance);
-
-  int gobackward = true;
-  lcd.setCursor(0, 2);
-  lcd.print("Motor stat ");
-  if (measureDistance < 22) {
-    digitalWrite(Dir_right, back);
-    analogWrite(Power_right, motor_speed);
-    digitalWrite(Dir_left, back);
-    analogWrite(Power_left, motor_speed);
-    lcd.print("Back");
-  } else 
-  if (measureDistance > 38){
-    digitalWrite(Dir_right, forw);
-    analogWrite(Power_right, motor_speed);
-    digitalWrite(Dir_left, forw);
-    analogWrite(Power_left, motor_speed);
-    lcd.print("Forw");
-  } else {
-    analogWrite(Power_right, 0);
-    analogWrite(Power_left, 0);
-    lcd.print("Off ");
-  }
-  }
-}
-
 //Average distance
 int disAve(int mean){
   if (mean <= 0) return -1;
@@ -343,7 +402,12 @@ int disAve(int mean){
       }
     }
     sum = sum / mean;
-    return (int) sum;
+    
+    //making it somewhat more accurate
+    double actual = sum * 1 - 15.4;
+    actual = round(actual);
+         
+    return (int) actual;
   }
 }
 
@@ -363,11 +427,17 @@ long compass(){
     raw = Wire.read();    
   }
   
-  return raw;
+  //convert it to 0-360 degree, not accurate but here it is
+  double dir = raw / 255 * 360;
+  
+  return (int) dir;
 }
 
 //controll the bot with compass
 void compassControl(int intent){
+  //intent is intention to where it should be going
+  //face is the current direction
+  //goal is how it should actually facing
   int face = compass();
   intent = round(intent * 128 / 180);
   int goal = face + intent;
