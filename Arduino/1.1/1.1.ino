@@ -3,7 +3,9 @@
 #include <LIDARLite.h>
 #include <math.h>
 
-LIDARLite myLidar;
+#define CMPS14_address 0x60   //for compass 
+
+LIDARLite myLidar;  //for lidar
 
 LiquidCrystal lcd(37, 36, 35, 34, 33, 32);
 
@@ -27,6 +29,10 @@ int adjDis = 30;
 
 //set path have to follow
 int path = 0;
+
+//for compass when to turn
+bool turnBool = false;
+double raw;
 
 void setup(){
   pinMode(swPin, INPUT);
@@ -91,6 +97,18 @@ void serialControl(){
     int panel = message.indexOf("Panel");
     int adjusted = message.indexOf("Adjust");
     int path = message.indexOf("Path");
+    int turn = message.indexOf("Turn");
+
+    if (turn > -1){
+      colon = message.indexOf(":");
+      if (colon > -1){
+        stat = message.substring(colon + 1);
+        value = stat.toInt();
+        Serial.print("Turn: "); Serial.println(value);
+        turnBool = true;
+        compassControl(value); 
+      }
+    }
 
     if (path > -1){
       colon = message.indexOf(":");
@@ -198,10 +216,14 @@ void showInfo(int lidar){
   //Print to LCD with a bar to determine the distance
   //Print raw value to LCD
   lcd.setCursor(11, 0);
+  //if i actually want more accuracy
+  //double actual = lidar*1-15.4;
+  //actual = round(actual);
+  //lcd.print((int)actual);
   lcd.print(lidar);
-  lcd.print(" ");
+  lcd.print("  ");
   lcd.print("cm");
-  lcd.print("   ");
+  lcd.print("  ");
   //Print the asterisk based on a metric
   int spaceAmount = 0;
   //lcd.setCursor(0, 0);
@@ -322,6 +344,77 @@ int disAve(int mean){
     }
     sum = sum / mean;
     return (int) sum;
+  }
+}
+
+//example code from moodle.
+long compass(){
+  Wire.begin();
+
+  Wire.beginTransmission(CMPS14_address);
+
+  Wire.write(1);
+
+  Wire.endTransmission(false);
+
+  Wire.requestFrom(CMPS14_address,1,true);
+
+  if (Wire.available() >= 1){
+    raw = Wire.read();    
+  }
+  
+  return raw;
+}
+
+//controll the bot with compass
+void compassControl(int intent){
+  int face = compass();
+  intent = round(intent * 128 / 180);
+  int goal = face + intent;
+
+  while(turnBool){
+    int current = compass();
+    if (intent > 0){
+      digitalWrite(Dir_left, forw);
+      digitalWrite(Dir_right, back);
+      analogWrite(Power_left, 100);
+      analogWrite(Power_right, 100);
+      if (goal < 256){
+        if (current > goal){
+          analogWrite(Power_left, 0);
+          analogWrite(Power_right, 0);
+          turnBool = false;
+        }
+      }
+      if (goal > 255){
+        if (current < 128 && current > (goal - 255)){
+          analogWrite(Power_left, 0);
+          analogWrite(Power_right, 0);
+          turnBool = false;
+        }
+      }
+    }
+
+    if (intent < 0){
+      digitalWrite(Dir_left, back);
+      digitalWrite(Dir_right, forw);
+      analogWrite(Power_left, 100);
+      analogWrite(Power_right, 100);
+      if (goal > 0){
+        if (current < goal){
+          analogWrite(Power_left, 0);
+          analogWrite(Power_right, 0);
+          turnBool = false;
+        }
+      }
+      if (goal < 0){
+        if (current > 127 && current < (goal + 255)){
+          analogWrite(Power_left, 0);
+          analogWrite(Power_right, 0);
+          turnBool = false;
+        }
+      }
+    }
   }
 }
 
