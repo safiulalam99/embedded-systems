@@ -101,19 +101,6 @@ void motor(double x, double y){
   analogWrite(Power_right, right);
 }
 
-//functions not used for anything at the moment
-int check_speed(double x, double y){
-  if (x + y > 255){
-    return 255;
-  }
-  if (x + y < -255){
-    return -255;
-  }
-  if (x + y < 255 && x + y > -255){
-    return x + y;
-  }
-}
-
 //controlling the bot using a set of values
 bool runState = true; //make the bot run at the first run
 bool analogControl(long distance, int motor_speed, bool gobackward){
@@ -235,6 +222,7 @@ void wheel_control(int intent){
   int init = compass();  
   intent = round(intent * 128 / 180);
   int goal = init + intent;
+  Serial.print(init); Serial.print("   ");
   Serial.println(goal);
   while (turnBool){
     int current = compass();

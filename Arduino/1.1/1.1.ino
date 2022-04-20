@@ -18,6 +18,14 @@ int swPin = 18;
 int buttonState = 0;
 bool taken = false;
 
+//move stuffs
+bool gobackward = false;
+int move_distance = 1;
+bool buttonPress = false;
+
+//compass stuff
+int angle = 0;
+
 //motors
 #define Dir_left    7
 #define Dir_right   8
@@ -43,10 +51,56 @@ bool turnBool = false;
 double raw;
 int turnMode = 0; //0 straight, 1 turn left, 2 turn right
 
+//"turn" command
+void compassControl(int intent);
+
+//transfer data stuff
+void distanceAndCompass(){
+	angle = compass();
+	angle = angle / 255 * 360;
+	Serial.println(angle);
+
+
+}
+
+//controlling the bot using a set of values
+bool runState = true; //make the bot run at the first run
+bool analogControl(long distance, int motor_speed, bool gobackward){
+  	//going to the front or back
+  	if (distance > 0) gobackward = false;  
+  	else {
+    	gobackward = true;
+    	distance = -distance;
+  	}
+
+  	//measured, for each 13.37 pulse from motor we moved 10mm. 
+  	//after moving a certain distance., stop
+  	if (previousRight < round(13.37 * distance) && previousLeft < round(13.37 * distance)){    //10mm = 13.37*10
+    	runState = true;
+    	digitalWrite(Dir_right, gobackward);
+    	analogWrite(Power_right, motor_speed);
+    	digitalWrite(Dir_left, gobackward);
+    	analogWrite(Power_left, motor_speed);
+  	} else {
+    	previousRight = 0;
+    	previousLeft = 0;
+    	buttonPress = false;
+    	runState = false;
+  	}
+  	return runState;
+}
+
 void setup(){
+	pinMode(10, OUTPUT);
+	pinMode(9, OUTPUT);
+  	pinMode(8, OUTPUT);
+  	pinMode(7, OUTPUT);
+  	pinMode(6, OUTPUT);
 	pinMode(swPin, INPUT);
 	pinMode(2, INPUT);
 	pinMode(3, INPUT);
+	pinMode(22, INPUT);
+  	pinMode(24, INPUT);
 	attachInterrupt(digitalPinToInterrupt(2), isr_right, RISING); //counting pulse from right motor
 	attachInterrupt(digitalPinToInterrupt(3), isr_left, RISING);  //counting pulse from left motor
 
@@ -81,7 +135,12 @@ void loop(){
 	double joystickX = analogRead(xPin);
 	double joystickY = 1023 - analogRead(yPin);
 	motor(joystickX, joystickY);
-
+	
+	//whenever the button is pressed, buttonPress switch to true => commit this code
+	while (buttonPress){  
+    	while(analogControl(move_distance, motor_speed, gobackward)); //control the bot with 3 known parameters
+    	//compass_control(); //not implemented on the board at the moment, but this function is intended to control the bot using the potential meters
+  	}
 	/*
 	* Calculate volume and control bot using serial;
 	*/
@@ -113,39 +172,6 @@ void adjDistance(){
 	}
 }
 
-//do the determined path
-void path1(){
-	Serial.println("Run 1");
-	adjDis = 20;
-	adjDistance();
-	Serial.println("continur 1");
-	compassControl(-90);
-	Serial.println("continue 2");
-	adjDis = 25;
-	adjDistance();
-	compassControl(-90);
-	adjDis = 20;
-	adjDistance();
-}
-
-void path2(){
-Serial.println("Run 2");
-	adjDis = 20;
-	adjDistance();
-	compassControl(-90);
-	adjDis = 25;
-	adjDistance();
-	compassControl(-135);
-	adjDis = 20;
-	adjDistance();
-	compassControl(45);
-	adjDis = 20;
-	adjDistance();
-	compassControl(90);
-	adjDis = 25;
-	adjDistance();
-}
-
 void serialControl(){
 	if (Serial.available() > 0){
 		String message = Serial.readStringUntil('\n');
@@ -160,6 +186,18 @@ void serialControl(){
 		int path = message.indexOf("Path");
 		int turn = message.indexOf("Turn");
 		int preset = message.indexOf("Run");
+		int movePos = message.indexOf("Move");
+
+		if (movePos > -1){
+      		colon = message.indexOf(":");
+      		if (colon > -1){
+        		stat = message.substring(colon + 1);
+        		move_distance = stat.toInt();
+        		gobackward = true;
+        		buttonPress = true;
+        		Serial.print("Move :");  Serial.println(move_distance);
+      		}
+    	}
 
 		if (preset > -1){
 			colon = message.indexOf(":");
@@ -167,10 +205,31 @@ void serialControl(){
 				stat = message.substring(colon + 1);
 				value = stat.toInt();
 				if (value == 1){
-					path1();          
+					Serial.println("Run 1");
+					adjDis = 25;
+					adjDistance();
+					Serial.println("continue 1");
+					turnBool = true;
+					compassControl(-90);
+					Serial.println("continue 2");
+					adjDis = 20;
+					adjDistance();
+					turnBool = true;
+					compassControl(-88);
+					adjDis = 20;
+					adjDistance();        
 				}
 				if (value == 2){
-					path2();
+					adjDis = 25;
+					adjDistance();
+					turnBool = true;
+					compassControl(-130);
+					adjDis = 20;
+					adjDistance();
+					turnBool = true;
+					compassControl(140);
+					adjDis = 20;
+					adjDistance();
 				}
 			}
 		}
@@ -232,7 +291,7 @@ void serialControl(){
 			y = myLidar.distance(true);
 			Serial.println(y);
 			x = x * y;
-			double area = x / 10000;
+			double area = x / 100;
 			lcd.setCursor(0, 3);
 			lcd.print("Area: ");      lcd.print(area);    lcd.print(" ");   lcd.print("m^2"); 
 		}
@@ -461,35 +520,37 @@ void compassControl(int intent){
 	int face = compass();
 	intent = round(intent * 128 / 180);
 	int goal = face + intent;
+	Serial.print(face); Serial.print("   ");
+	Serial.println(goal);
 
 	while(turnBool){
 		int current = compass();
 		if (intent > 0){
 		digitalWrite(Dir_left, forw);
 		digitalWrite(Dir_right, back);
-		analogWrite(Power_left, 100);
-		analogWrite(Power_right, 100);
-		if (goal < 256){
-			if (current > goal){
-			analogWrite(Power_left, 0);
-			analogWrite(Power_right, 0);
-			turnBool = false;
+		analogWrite(Power_left, 150);
+		analogWrite(Power_right, 150);
+			if (goal < 256){
+				if (current > goal){
+				analogWrite(Power_left, 0);
+				analogWrite(Power_right, 0);
+				turnBool = false;
+				}
 			}
-		}
-		if (goal > 255){
-			if (current < 128 && current > (goal - 255)){
-			analogWrite(Power_left, 0);
-			analogWrite(Power_right, 0);
-			turnBool = false;
+			if (goal > 255){
+				if (current < 128 && current > (goal - 255)){
+				analogWrite(Power_left, 0);
+				analogWrite(Power_right, 0);
+				turnBool = false;
+				}
 			}
-		}
 		}
 
 		if (intent < 0){
 		digitalWrite(Dir_left, back);
 		digitalWrite(Dir_right, forw);
-		analogWrite(Power_left, 100);
-		analogWrite(Power_right, 100);
+		analogWrite(Power_left, 150);
+		analogWrite(Power_right, 150);
 		if (goal > 0){
 			if (current < goal){
 			analogWrite(Power_left, 0);

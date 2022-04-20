@@ -2,5 +2,6 @@
     "configuration": "cpu=atmega2560",
     "board": "arduino:avr:mega",
     "sketch": "1.1.ino",
-    "programmer": "arduino:avrisp"
+    "programmer": "arduino:avrisp",
+    "port": "COM5"
 }
