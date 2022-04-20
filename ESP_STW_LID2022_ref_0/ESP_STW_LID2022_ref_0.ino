@@ -130,7 +130,21 @@ void setup()
     
   });
 
+  server.on("/beautiful.min.css", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+    request->send(SPIFFS, "/beautiful.min.css", "text/css");
+    
+    Serial.println(" beautiful css GET ");
+    
+  });
 
+  server.on("/backgrond.jpg", HTTP_GET, [](AsyncWebServerRequest *request)
+  {
+    request->send(SPIFFS, "/backgrond.jpg", "image/jpg");
+    
+    Serial.println(" background GET ");
+    
+  });
                                                                                 //  Method GET - query from MEGA to to web page tag is / from_MEGA
   server.on("/from_MEGA", HTTP_GET, [](AsyncWebServerRequest *request)
     {
