@@ -48,3 +48,27 @@ img {
   background-size: cover;
   background-image: url("backgrond.jpg");
 }
+
+.title_bar {
+  position: absolute;
+  bottom: 30%;
+  font-size: 20px;
+  font-family: sans-serif;
+  left: 20%;
+}
+
+.distance_bar {
+  position: absolute;
+  top: 10%;
+  background-color: rgb(255, 255, 255);
+  width: 10px;
+  height: 50%;
+  left: 50%;
+  border: 1px solid;
+  border-color: aqua;
+  border-radius: 5px;
+  background: linear-gradient(
+    rgba(255, 255, 255, 1) 30%,
+    rgb(133, 232, 232, 1) 70%
+  );
+}

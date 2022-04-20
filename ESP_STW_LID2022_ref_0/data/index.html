@@ -39,6 +39,7 @@
 	<link href="roundslider.min.css" rel="stylesheet" />
 	<link href="beautiful.min.css" rel="stylesheet" />
 	<script src="roundslider.min.js"></script>
+	<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script> -->
 </head>
 
 
@@ -69,11 +70,22 @@
 		<canvas class="canvas" id="canvas" width="600px" height="450px"></canvas>
 	</div>
 
-	<span class="sensor-labels">Distance</span>
-	<span id="Box_lidar_dist">%Dist%</span>
-	<sup class="units">cm</sup>
+	<div class="distance_bar" id="distanceBar">
+		<!-- <p style="top: 0;">100 cm</p>
+		<p style="bottom: 0; position:absolute;">0 cm</p> -->
+	</div>
 
-	</p>
+	<div class="title_bar">
+		<span class="sensor-labels">Distance</span>
+		<span id="Box_lidar_dist">%Dist%</span>
+		<sup class="units">cm</sup>
+		<br>
+		<span class="sensor-labels">Direction</span>
+		<span id="Box_compass_dire">%Dire%</span>
+		<sup class="units">o</sup>
+	</div>
+
+
 
 	</div>
 
@@ -92,6 +104,56 @@
 
 
 		var valx = document.getElementById("rd_slider_1").value;				// roundslider variable
+
+		let height = screen.height;
+		let distanceBar = document.querySelector('#distanceBar')
+		var distanceBar1 = document.getElementById("distanceBar")
+
+		function getOffset(el) {
+			const rect = el.getBoundingClientRect();
+			return {
+				left: rect.left + window.scrollX,
+				top: rect.top + window.scrollY,
+				bottom: rect.bottom + window.scrollY
+			};
+		}
+
+		document.addEventListener('mousemove', logKey);
+
+
+
+		function logKey(e) {
+			// coordinate of element 
+			console.log(`
+		barX: ${getOffset(distanceBar).left}
+		y-top: ${getOffset(distanceBar).top}
+		y-bottom: ${getOffset(distanceBar).bottom}
+		screen: ${height}`);
+
+			//heigh is screen height and in css barHeight assign 50% off screen height
+			let barTop = getOffset(distanceBar).top;
+			let barHeight = height / 2;
+			let barBottom = getOffset(distanceBar).bottom;
+			let barX = getOffset(distanceBar).left;
+			let mousePosition = (e.clientY - barTop) * 100 / (barBottom - barTop);
+			let hello = 100 - mousePosition;
+
+
+			if ((barX - 1) < e.clientX && e.clientX < (barX + 12) && barTop < e.clientY && e.clientY < barBottom) {
+				distanceBar.style.background =
+					"linear-gradient(rgb(255, 255, 255,1), "
+					+ mousePosition
+					+ "%,rgb(133, 232, 232, 1) "
+					+ hello
+					+ "%)";
+			} else {
+				console.log("not working");
+			}
+
+
+
+		}
+
 
 
 
@@ -130,6 +192,7 @@
 			if (mode == 2) { xmlHttp.open("GET", '/?dist=' + dist, true); };			// send distance   TAG "dist"	true for asynchronous 
 			xmlHttp.send(null);
 		}
+
 
 
 
@@ -624,7 +687,7 @@
 		var can = document.getElementById('canvasImg');
 		var ctx = can.getContext('2d');
 		var canvasDiv = document.getElementById('canvasDiv');
-		var setDegree = 0;
+		var setDegree = dire;
 		var degree = 0;
 
 
@@ -639,10 +702,7 @@
 
 		var dirBox = document.getElementById("Box_compass_dire");
 
-		setInterval(function ()									// timer inreval function
-		{
-			setDegree += 10;
-		}, 500);
+
 
 
 
@@ -658,7 +718,7 @@
 			else if (degree == -1) {
 				degree = 359;
 			}
-			else if ((setDegree - degree) > 320) {
+			else if ((setDegree - degree) >= 320) {
 				degree -= 1;
 			}
 			else if (degree < setDegree) {
@@ -673,13 +733,17 @@
 
 
 
-			console.log("degree: " + degree);
-			console.log("Setdegree: " + setDegree);
+			/* console.log("degree: " + degree);
+			console.log("Setdegree: " + setDegree); */
 
 			imgCanvas.style.transform = `rotate(${degree}deg)`;
 
 			dirBox.innerHTML = degree;
 		}, 50);
+
+		//scrooll bar for distance
+
+
 
 
 
